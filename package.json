@@ -59,7 +59,7 @@
     "jiti": "^2.7.0",
     "npm-run-all2": "^9.0.4",
     "prettier": "^3.9.6",
-    "typescript": "~6.0.0",
+    "typescript": "~7.0.2",
     "vite": "^8.3.5",
     "vitest": "^5.0.5",
     "vue-eslint-parser": "^10.4.1",
