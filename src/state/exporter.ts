@@ -131,9 +131,10 @@ function isMobile(): boolean {
   return typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
 }
 
-function offerShare(result: ExportResult) {
+/** On phones, offers the share sheet (e.g. to save to Photos). Returns whether it did. */
+function offerShare(result: ExportResult): boolean {
   const file = new File([result.blob], result.name, { type: result.blob.type })
-  if (!isMobile() || !result.blob.type.startsWith('image/') || !canShareFiles([file])) return
+  if (!isMobile() || !result.blob.type.startsWith('image/') || !canShareFiles([file])) return false
   showToast(t('export.shareHint'), 'info', {
     timeout: 12_000,
     action: {
@@ -141,6 +142,7 @@ function offerShare(result: ExportResult) {
       run: () => void navigator.share({ files: [file] }).catch(() => {}),
     },
   })
+  return true
 }
 
 /** Exports the given files. Resolves when the downloads have been handed to the browser. */
@@ -201,9 +203,10 @@ export async function exportFiles(list: readonly FileItem[]): Promise<void> {
       exportState.done++
     }
 
+    let shareOffered = false
     if (single) {
       downloadBlob(single.blob, single.name)
-      offerShare(single)
+      shareOffered = offerShare(single)
     } else if (zip && succeeded) {
       exportState.currentName = t('export.zipping')
       await nextFrame()
@@ -214,7 +217,7 @@ export async function exportFiles(list: readonly FileItem[]): Promise<void> {
     if (failed.length) {
       const details = failed.map((f) => `${f.name}: ${t(f.reason)}`).join('\n')
       showToast(`${t('export.failed', { count: failed.length })}\n${details}`, 'error')
-    } else if (succeeded) {
+    } else if (succeeded && !shareOffered) {
       showToast(t('export.done', { count: succeeded }), 'success')
     }
   } catch (error) {
