@@ -50,6 +50,7 @@ const messages = {
   'content.logoReplace': '更换',
   'content.logoRemove': '移除 Logo',
   'content.logoHint': '建议使用背景透明的 PNG 图片。',
+  'content.logoNotRemembered': '这张 Logo 较大，不会保存到下次访问，届时需要重新选择。',
   'content.logoFailed': '无法读取图片：{name}',
 
   'variables.date': '日期，如 2026-10-24',
@@ -156,6 +157,8 @@ const messages = {
   'export.recommended': '推荐',
   'export.suffix': '文件名后缀',
   'export.suffixHint': '示例：{example}',
+  'export.emptyText': '请先输入水印文字',
+  'export.emptyLogo': '请先选择 Logo 图片',
   'export.current': '导出当前',
   'export.currentHint': '只导出预览中的文件',
   'export.all': '导出',

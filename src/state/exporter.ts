@@ -15,8 +15,8 @@ import { drawWatermark, type LogoAsset, type WatermarkContent } from '@/core/ren
 import { dependsOnPage, resolveTemplate } from '@/core/template'
 import { createZipWriter } from '@/core/zip'
 import { t, type MessageKey } from '@/i18n'
-import { errorMessageKey, withPdfDocument, type FileItem } from './files'
-import { config, exportOptions, logo } from './settings'
+import { errorMessageKey, items, withPdfDocument, type FileItem } from './files'
+import { config, emptyWatermarkReason, exportOptions, logo } from './settings'
 import { showToast } from './toasts'
 
 export interface ExportResult {
@@ -150,6 +150,10 @@ export async function exportFiles(list: readonly FileItem[]): Promise<void> {
   if (exportState.running) return
   const ready = list.filter((item) => item.status === 'ready')
   if (!ready.length) return
+  if (emptyWatermarkReason.value) {
+    showToast(t(emptyWatermarkReason.value), 'error')
+    return
+  }
 
   controller = new AbortController()
   const { signal } = controller
@@ -185,20 +189,30 @@ export async function exportFiles(list: readonly FileItem[]): Promise<void> {
   try {
     for (const item of ready) {
       signal.throwIfAborted()
-      exportState.currentName = item.name
-      exportState.fileProgress = 0
-      await nextFrame()
-      try {
-        const result = await (item.kind === 'image' ? exportImage(item, job) : exportPdf(item, job))
-        signal.throwIfAborted()
-        result.notes.forEach((note) => notes.add(note))
-        if (zip) await zip.add(uniqueFileName(result.name, usedNames), result.blob)
-        else single = result
-        succeeded++
-      } catch (error) {
-        if (signal.aborted) throw error
-        console.error(`Failed to export ${item.name}`, error)
-        failed.push({ name: item.name, reason: errorMessageKey(error) })
+      // Files removed from the list while the export runs are left out.
+      const removed = () => !items.includes(item)
+      if (!removed()) {
+        exportState.currentName = item.name
+        exportState.fileProgress = 0
+        await nextFrame()
+        try {
+          const result = await (item.kind === 'image'
+            ? exportImage(item, job)
+            : exportPdf(item, job))
+          signal.throwIfAborted()
+          if (!removed()) {
+            result.notes.forEach((note) => notes.add(note))
+            if (zip) await zip.add(uniqueFileName(result.name, usedNames), result.blob)
+            else single = result
+            succeeded++
+          }
+        } catch (error) {
+          if (signal.aborted) throw error
+          if (!removed()) {
+            console.error(`Failed to export ${item.name}`, error)
+            failed.push({ name: item.name, reason: errorMessageKey(error) })
+          }
+        }
       }
       exportState.done++
     }

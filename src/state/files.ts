@@ -110,6 +110,10 @@ export async function withPdfDocument<T>(
     return await use(await entry.promise)
   } finally {
     entry.users--
+    // The file may have been removed while the document was in use.
+    if (entry.users === 0 && !items.includes(item) && openPdfs.get(item.id) === entry) {
+      closePdf(item.id)
+    }
     evictPdfs()
   }
 }

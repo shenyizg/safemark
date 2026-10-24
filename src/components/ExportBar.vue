@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { Download, FileArchive, LoaderCircle, X } from '@lucide/vue'
+import { Download, FileArchive, LoaderCircle, TriangleAlert, X } from '@lucide/vue'
 import { computed } from 'vue'
 
 import { t } from '@/i18n'
 import { cancelExport, exportFiles, exportState } from '@/state/exporter'
 import { activeItem, items } from '@/state/files'
+import { emptyWatermarkReason } from '@/state/settings'
 
 const readyItems = computed(() => items.filter((item) => item.status === 'ready'))
-const canExportCurrent = computed(() => activeItem.value?.status === 'ready')
+const canExportCurrent = computed(
+  () => activeItem.value?.status === 'ready' && !emptyWatermarkReason.value,
+)
 
 const progress = computed(() => {
   if (!exportState.total) return 0
@@ -43,7 +46,10 @@ function exportAll() {
       </div>
       <div class="bar"><div class="bar-fill" :style="{ width: `${progress * 100}%` }" /></div>
     </div>
-    <div v-else class="buttons" :class="{ single: items.length <= 1 }">
+    <p v-if="!exportState.running && items.length && emptyWatermarkReason" class="warning">
+      <TriangleAlert aria-hidden="true" />{{ t(emptyWatermarkReason) }}
+    </p>
+    <div v-if="!exportState.running" class="buttons" :class="{ single: items.length <= 1 }">
       <button
         v-if="items.length > 1"
         type="button"
@@ -57,7 +63,7 @@ function exportAll() {
       <button
         type="button"
         class="btn btn-lg btn-primary"
-        :disabled="!readyItems.length"
+        :disabled="!readyItems.length || !!emptyWatermarkReason"
         @click="exportAll"
       >
         <FileArchive v-if="readyItems.length > 1" aria-hidden="true" />
@@ -75,6 +81,21 @@ function exportAll() {
   padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--c-border);
   background: var(--c-surface);
+}
+
+.warning {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  color: var(--c-danger);
+  font-size: 12.5px;
+}
+
+.warning svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
 }
 
 .buttons {

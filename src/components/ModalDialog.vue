@@ -24,6 +24,15 @@ function onClick(event: MouseEvent) {
   // A click on the backdrop targets the <dialog> element itself.
   if (event.target === dialog.value) emit('close')
 }
+
+/**
+ * The native `close` event fires asynchronously. Only report closes the user caused (Escape):
+ * by the time an event from closing it programmatically arrives, the dialog may already show
+ * new content (e.g. the next password prompt) that must not be dismissed.
+ */
+function onNativeClose() {
+  if (props.open && !dialog.value?.open) emit('close')
+}
 </script>
 
 <template>
@@ -32,7 +41,7 @@ function onClick(event: MouseEvent) {
     class="modal"
     :class="{ wide }"
     :aria-labelledby="titleId"
-    @close="emit('close')"
+    @close="onNativeClose"
     @click="onClick"
   >
     <div class="modal-content">

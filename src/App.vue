@@ -116,7 +116,7 @@ function onKeyDown(event: KeyboardEvent) {
   }
   if (mod || event.altKey || isTyping(event.target) || document.querySelector('dialog[open]'))
     return
-  const pages = activeItem.value?.pages ?? 1
+  const pages = activeItem.value?.pages || 1
   switch (event.key) {
     case 'ArrowLeft':
       selectRelative(-1)

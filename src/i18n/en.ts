@@ -53,6 +53,8 @@ const messages: Record<MessageKey, string> = {
   'content.logoReplace': 'Replace',
   'content.logoRemove': 'Remove logo',
   'content.logoHint': 'A PNG with a transparent background works best.',
+  'content.logoNotRemembered':
+    'This logo is too large to be remembered; you will need to choose it again next time.',
   'content.logoFailed': 'Could not read the image: {name}',
 
   'variables.date': 'Date, e.g. 2026-10-24',
@@ -161,6 +163,8 @@ const messages: Record<MessageKey, string> = {
   'export.recommended': 'recommended',
   'export.suffix': 'File name suffix',
   'export.suffixHint': 'Example: {example}',
+  'export.emptyText': 'Enter the watermark text first',
+  'export.emptyLogo': 'Choose a logo image first',
   'export.current': 'Export this',
   'export.currentHint': 'Export only the file shown in the preview',
   'export.all': 'Export',

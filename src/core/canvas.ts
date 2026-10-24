@@ -36,7 +36,8 @@ export function allocCanvas(width: number, height: number): AllocatedCanvas {
   throw new CanvasTooLargeError()
 }
 
-function isUsable(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+/** Whether drawing on the canvas works: oversized canvases silently ignore every operation. */
+export function isUsable(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
   try {
     ctx.fillStyle = '#000'
     ctx.fillRect(w - 1, h - 1, 1, 1)

@@ -20,7 +20,9 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE)
-      .then((cache) => cache.addAll(PRECACHE))
+      // Bypass the HTTP cache: static hosts let browsers reuse responses for a while (GitHub
+      // Pages: 10 minutes), which could put a pre-deploy index.html into the new cache.
+      .then((cache) => cache.addAll(PRECACHE.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   )
 })
@@ -38,6 +40,12 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+/** The app's own page: the scope root or index.html. */
+function isAppPage(url) {
+  const scope = new URL(self.registration.scope).pathname
+  return url.pathname === scope || url.pathname === `${scope}index.html`
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
@@ -45,6 +53,8 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
 
   if (request.mode === 'navigate') {
+    // Other pages (e.g. the license file) go straight to the network.
+    if (!isAppPage(url)) return
     // App shell: serve the cached page of this version, fall back to the network.
     event.respondWith(
       caches
@@ -64,7 +74,10 @@ self.addEventListener('fetch', (event) => {
       if (!cached && url.pathname.includes('/assets/')) cached = await caches.match(request, MATCH)
       if (cached) return cached
       const response = await fetch(request)
-      if (response.ok && response.type === 'basic') await cache.put(request, response.clone())
+      if (response.ok && response.type === 'basic') {
+        // Caching is best effort: a full storage must not turn a good response into an error.
+        event.waitUntil(cache.put(request, response.clone()).catch(() => {}))
+      }
       return response
     })(),
   )

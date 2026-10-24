@@ -38,8 +38,9 @@ async function chooseLogo() {
   const [file] = await pickFiles({ accept: 'image/*' })
   if (!file) return
   try {
-    await setLogoFile(file)
+    const remembered = await setLogoFile(file)
     config.kind = 'image'
+    if (!remembered) showToast(t('content.logoNotRemembered'))
   } catch {
     showToast(t('content.logoFailed', { name: file.name }), 'error')
   }

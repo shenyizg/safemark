@@ -180,6 +180,27 @@ test('opens password-protected PDFs', async ({ page }) => {
   await expect(page.getByText('Encrypted PDFs cannot be edited in place')).toBeVisible()
 })
 
+test('asks for the passwords of several PDFs one after another', async ({ page }) => {
+  await page.goto('/')
+  const bytes = await fs.readFile(fixture('encrypted-user-password.pdf'))
+  await addFiles(page, [
+    { name: 'first.pdf', mimeType: 'application/pdf', buffer: bytes },
+    { name: 'second.pdf', mimeType: 'application/pdf', buffer: bytes },
+  ])
+  const dialog = page.getByRole('dialog', { name: 'Password required' })
+  // Both files open concurrently, so either may ask first.
+  for (let i = 0; i < 2; i++) {
+    const message = dialog.getByText(/(first|second)\.pdf/)
+    await expect(message).toBeVisible()
+    const name = /(first|second)\.pdf/.exec(await message.innerText())![0]
+    await dialog.getByLabel('PDF password').fill('safemark')
+    await dialog.getByRole('button', { name: 'Open' }).click()
+    await expect(dialog.getByText(name)).toBeHidden()
+  }
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Export all (2)' })).toBeEnabled()
+})
+
 test('a cancelled password prompt marks the file as failed', async ({ page }) => {
   await page.goto('/')
   await addFiles(page, fixture('encrypted-user-password.pdf'))
@@ -197,6 +218,68 @@ test('watermarks PDFs that only have an owner password', async ({ page }) => {
   await page.getByRole('button', { name: 'Export', exact: true }).click()
   const pdf = await PDFDocument.load(await readDownload(await downloadPromise))
   expect(pdf.getPageCount()).toBe(1)
+})
+
+test('refuses to export without watermark content', async ({ page }) => {
+  await loadSamples(page)
+  await page.getByLabel('Watermark text (multi-line)').fill('   ')
+  await expect(page.getByText('Enter the watermark text first')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Export all (2)' })).toBeDisabled()
+})
+
+test('keeps the watermark with extreme shadow settings on large images', async ({ page }) => {
+  await page.goto('/')
+  // A 6000×4000 white image, generated in the page.
+  const png = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 6000
+    canvas.height = 4000
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, 6000, 4000)
+    const blob = await new Promise<Blob>((resolve) =>
+      canvas.toBlob((b) => resolve(b!), 'image/png'),
+    )
+    return Array.from(new Uint8Array(await blob.arrayBuffer()))
+  })
+  await addFiles(page, { name: 'large.png', mimeType: 'image/png', buffer: Buffer.from(png) })
+
+  await page.getByRole('radio', { name: 'Image / logo' }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Choose a logo image' }).click()
+  await (await chooser).setFiles(path.join(import.meta.dirname, '..', 'public', 'favicon.svg'))
+  for (const [name, value] of [
+    ['Logo width', '100'],
+    ['Opacity', '100'],
+  ] as const) {
+    await page.getByRole('spinbutton', { name }).fill(value)
+    await page.getByRole('spinbutton', { name }).press('Enter')
+  }
+  await page.getByRole('button', { name: 'Effects', exact: true }).click()
+  await page.getByRole('switch', { name: 'Shadow' }).click()
+  for (const [name, value] of [
+    ['Blur', '100'],
+    ['Offset', '50'],
+  ] as const) {
+    await page.getByRole('spinbutton', { name }).fill(value)
+    await page.getByRole('spinbutton', { name }).press('Enter')
+  }
+
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export', exact: true }).click()
+  const exported = await readDownload(await downloadPromise)
+  // The logo (with its shadow) covers much of the white image.
+  const covered = await page.evaluate(async (bytes) => {
+    const bitmap = await createImageBitmap(new Blob([new Uint8Array(bytes)]))
+    const canvas = new OffscreenCanvas(300, 200)
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(bitmap, 0, 0, 300, 200)
+    const { data } = ctx.getImageData(0, 0, 300, 200)
+    let marked = 0
+    for (let i = 0; i < data.length; i += 4) if (data[i]! < 240 || data[i + 2]! < 240) marked++
+    return marked / (data.length / 4)
+  }, Array.from(exported))
+  expect(covered).toBeGreaterThan(0.2)
 })
 
 test('uses an image as the watermark', async ({ page }) => {
@@ -270,4 +353,8 @@ test('keeps working offline after the first visit', async ({ page, context, brow
   await page.getByRole('button', { name: 'Try with samples' }).click()
   await expect(page.getByRole('button', { name: 'Export all (2)' })).toBeEnabled()
   await context.setOffline(false)
+
+  // Pages other than the app itself are not replaced by it.
+  await page.goto('/third-party-licenses.txt')
+  await expect(page.getByText('The app bundles dependencies')).toBeVisible()
 })

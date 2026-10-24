@@ -1,4 +1,4 @@
-import { reactive, shallowRef, watch } from 'vue'
+import { computed, reactive, shallowRef, watch } from 'vue'
 
 import {
   DEFAULT_CONFIG,
@@ -9,7 +9,7 @@ import {
   type WatermarkConfig,
 } from '@/core/config'
 import { isCustomFontFamily } from '@/core/fonts'
-import { t } from '@/i18n'
+import { t, type MessageKey } from '@/i18n'
 import { fonts } from './fonts'
 import { readStored, removeStored, writeStored } from './storage'
 
@@ -211,15 +211,18 @@ async function imageFromDataUrl(dataUrl: string): Promise<HTMLImageElement> {
   return image
 }
 
-export async function setLogoFile(file: File): Promise<void> {
+/** Sets the logo. Resolves to whether it will also be remembered for the next visit. */
+export async function setLogoFile(file: File): Promise<boolean> {
   const dataUrl = await readAsDataUrl(file)
   const image = await imageFromDataUrl(dataUrl)
   const width = image.naturalWidth || 512
   const height = image.naturalHeight || 512
   logo.value = { name: file.name, image, width, height }
-  if (dataUrl.length > MAX_STORED_LOGO || !writeStored('logo', { name: file.name, dataUrl })) {
-    removeStored('logo')
+  if (dataUrl.length <= MAX_STORED_LOGO && writeStored('logo', { name: file.name, dataUrl })) {
+    return true
   }
+  removeStored('logo')
+  return false
 }
 
 export function clearLogo(): void {
@@ -244,3 +247,9 @@ export async function restoreLogo(): Promise<void> {
     removeStored('logo')
   }
 }
+
+/** Why the current settings would not draw any watermark, if they would not. */
+export const emptyWatermarkReason = computed<MessageKey | null>(() => {
+  if (config.kind === 'image') return logo.value ? null : 'export.emptyLogo'
+  return config.text.trim() ? null : 'export.emptyText'
+})

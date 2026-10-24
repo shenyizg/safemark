@@ -3,6 +3,7 @@
  * function, so what you see is exactly what you get — just at a different resolution.
  */
 
+import { CanvasTooLargeError, isUsable } from './canvas'
 import type { WatermarkConfig } from './config'
 import { singleCenter, tileCenters, type Point, type Rect, type Size } from './layout'
 
@@ -22,10 +23,14 @@ export interface WatermarkContent {
  * The watermark is first drawn opaque onto a separate layer which is then composited with the
  * configured opacity (and shadow). This keeps overlapping strokes, fills and tiles from
  * stacking up into darker spots. Huge images are processed in horizontal bands so the layer
- * never needs more than this many pixels.
+ * normally stays below this many pixels…
  */
-const MAX_LAYER_PIXELS = 8_000_000
+const LAYER_PIXELS = 8_000_000
+/** …and never exceeds this many (iOS Safari refuses canvases above ~16.7 megapixels). */
+const MAX_LAYER_PIXELS = 16_000_000
 const MAX_CANVAS_SIDE = 32_767
+/** Shadow blur and offset are capped at this share of the image's shorter side. */
+const MAX_SHADOW_EXTENT = 0.06
 
 const GENERIC_FAMILIES = new Set([
   'serif',
@@ -81,6 +86,8 @@ interface Frame {
 interface Metrics {
   /** Outer size of one watermark, used for spacing and positioning. */
   block: Size
+  /** Width of the widest text line (the block can be wider because of a frame). */
+  textWidth: number
   /** Reference length for gaps and effects: the font size, or the logo's shorter side. */
   unit: number
   fontPx: number
@@ -103,6 +110,7 @@ function measure(config: WatermarkConfig, content: WatermarkContent, size: Size)
     const height = (width * logo.height) / logo.width
     return {
       block: { width, height },
+      textWidth: 0,
       unit: Math.min(width, height),
       fontPx: 0,
       spacingPx: 0,
@@ -154,7 +162,7 @@ function measure(config: WatermarkConfig, content: WatermarkContent, size: Size)
     }
     block = { width: frame.width + line, height: frame.height + line }
   }
-  return { block, unit: fontPx, fontPx, spacingPx, lineHeightPx, lines, frame }
+  return { block, textWidth, unit: fontPx, fontPx, spacingPx, lineHeightPx, lines, frame }
 }
 
 type PaintText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number) => void
@@ -179,16 +187,16 @@ function paintLines(
   m: Metrics,
   paint: PaintText,
 ) {
-  const blockW = m.block.width
+  const textW = m.textWidth
   const top = -((m.lines.length - 1) * m.lineHeightPx) / 2
   m.lines.forEach((line, i) => {
     if (!line.text) return
     const y = top + i * m.lineHeightPx
     let x =
       config.textAlign === 'left'
-        ? -blockW / 2
+        ? -textW / 2
         : config.textAlign === 'right'
-          ? blockW / 2 - line.width
+          ? textW / 2 - line.width
           : -line.width / 2
     if (!line.glyphs) {
       paint(ctx, line.text, x, y)
@@ -287,13 +295,23 @@ function paintBlocks(
 
 let sharedLayer: HTMLCanvasElement | null = null
 
-function layerCanvas(width: number, height: number): HTMLCanvasElement {
+function layerContext(width: number, height: number): CanvasRenderingContext2D {
   sharedLayer ??= document.createElement('canvas')
-  if (sharedLayer.width !== width || sharedLayer.height !== height) {
+  const resized = sharedLayer.width !== width || sharedLayer.height !== height
+  if (resized) {
     sharedLayer.width = width
     sharedLayer.height = height
   }
-  return sharedLayer
+  const ctx = sharedLayer.getContext('2d')
+  // Browsers silently turn canvases beyond their limits into no-ops; fail loudly instead of
+  // exporting an image without a watermark. Small layers (the preview) are always fine.
+  const verify = resized && width * height > LAYER_PIXELS
+  if (!ctx || (verify && !isUsable(ctx, width, height))) {
+    sharedLayer.width = 0
+    sharedLayer.height = 0
+    throw new CanvasTooLargeError()
+  }
+  return ctx
 }
 
 /** Large layers (exports) are freed right away; small ones (preview) are kept for reuse. */
@@ -331,10 +349,11 @@ export function drawWatermark(
   if (!m) return
 
   const angle = (-config.rotation * Math.PI) / 180
+  const maxShadow = MAX_SHADOW_EXTENT * Math.min(width, height)
   const shadow = config.shadowEnabled
     ? {
-        blur: (config.shadowBlur / 100) * m.unit,
-        offset: (config.shadowOffset / 100) * m.unit,
+        blur: Math.min((config.shadowBlur / 100) * m.unit, maxShadow),
+        offset: Math.min((config.shadowOffset / 100) * m.unit, maxShadow),
       }
     : null
   // Watermarks just outside a band (or the image) can still cast a shadow into it.
@@ -342,11 +361,12 @@ export function drawWatermark(
   // Canvases are limited to 32767 pixels per side; very wide images get less side padding.
   const padX = Math.max(0, Math.min(pad, Math.floor((MAX_CANVAS_SIDE - width) / 2)))
   const layerW = width + 2 * padX
-  const bandH = Math.min(
-    height,
-    MAX_CANVAS_SIDE - 2 * pad,
-    Math.max(64, Math.floor(MAX_LAYER_PIXELS / layerW) - 2 * pad),
-  )
+  const bandFor = (pixels: number) => Math.floor(pixels / layerW) - 2 * pad
+  // Thin bands would mostly consist of padding (slow, and every band repeats the shadow
+  // work), so allow a bigger layer before going below twice the padding.
+  let bandH = bandFor(LAYER_PIXELS)
+  if (bandH < 2 * pad) bandH = Math.max(bandH, Math.min(2 * pad, bandFor(MAX_LAYER_PIXELS)))
+  bandH = Math.max(64, Math.min(height, MAX_CANVAS_SIDE - 2 * pad, bandH))
 
   const single =
     config.layout === 'single'
@@ -362,9 +382,8 @@ export function drawWatermark(
         ]
       : null
 
-  const layer = layerCanvas(layerW, bandH + 2 * pad)
-  const ctx = layer.getContext('2d')
-  if (!ctx) throw new Error('Canvas 2D is not available')
+  const ctx = layerContext(layerW, bandH + 2 * pad)
+  const layer = ctx.canvas
 
   try {
     for (let y0 = 0; y0 < height; y0 += bandH) {
