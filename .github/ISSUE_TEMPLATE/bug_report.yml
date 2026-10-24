@@ -1,0 +1,42 @@
+name: 🐞 Bug report / 问题反馈
+description: Something does not work as expected / 功能异常或出错
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! **Please do not attach private documents** — a sample file or a screenshot of the settings is enough.
+        感谢反馈！**请不要上传包含个人信息的文件**，提供示例文件或设置截图即可。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened? / 问题描述
+      description: What did you do, what did you expect, and what happened instead? / 你做了什么、期望的结果是什么、实际发生了什么？
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      placeholder: |
+        1. Open a PDF with …
+        2. Set the layout to …
+        3. Click “Export” …
+  - type: input
+    id: file
+    attributes:
+      label: File type and size / 文件类型与大小
+      placeholder: e.g. JPG 4000×3000, PDF 12 pages
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and OS / 浏览器与系统
+      placeholder: e.g. Chrome 141 on Windows 11, Safari on iOS 19
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors / 控制台错误（可选）
+      description: Developer tools → Console / 开发者工具 → 控制台
+      render: text

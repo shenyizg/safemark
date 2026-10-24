@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 🔒 Security or privacy issue / 安全与隐私问题
+    url: https://github.com/shenyizg/safemark/security/advisories/new
+    about: Please report vulnerabilities privately. / 请通过私密渠道报告安全漏洞。

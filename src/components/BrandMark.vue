@@ -1,0 +1,32 @@
+<script setup lang="ts">
+import { useId } from 'vue'
+
+const id = useId()
+</script>
+
+<template>
+  <svg viewBox="0 0 32 32" class="brand-mark" aria-hidden="true">
+    <defs>
+      <linearGradient :id="`${id}-g`" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#17a8a6" />
+        <stop offset="1" stop-color="#0a6c78" />
+      </linearGradient>
+      <clipPath :id="`${id}-c`">
+        <rect width="32" height="32" rx="8" />
+      </clipPath>
+    </defs>
+    <rect width="32" height="32" rx="8" :fill="`url(#${id}-g)`" />
+    <g
+      :clip-path="`url(#${id}-c)`"
+      fill="none"
+      stroke="#fff"
+      stroke-linecap="round"
+      stroke-width="2.6"
+      transform="rotate(-30 16 16)"
+    >
+      <path d="M-4 8.5h9M10 8.5h9M24 8.5h9" opacity=".5" />
+      <path d="M3 16h9M17 16h12" />
+      <path d="M-4 23.5h9M10 23.5h9M24 23.5h9" opacity=".5" />
+    </g>
+  </svg>
+</template>

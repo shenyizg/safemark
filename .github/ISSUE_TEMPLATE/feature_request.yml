@@ -1,0 +1,20 @@
+name: 💡 Feature request / 功能建议
+description: Suggest an idea for SafeMark / 提出新功能或改进建议
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve? / 想解决什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: How should it work? / 期望的效果
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy / 隐私
+      options:
+        - label: The feature can work without sending data to any server. / 该功能无需把数据发送到任何服务器即可实现。

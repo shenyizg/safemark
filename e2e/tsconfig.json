@@ -1,0 +1,8 @@
+{
+  "extends": "@tsconfig/node24/tsconfig.json",
+  "include": ["./**/*"],
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"],
+    "noEmit": true
+  }
+}
