@@ -38,11 +38,11 @@
     "generate:assets": "node scripts/generate-assets.mjs"
   },
   "dependencies": {
-    "@lucide/vue": "^1.61.0",
+    "@lucide/vue": "^1.72.0",
     "fflate": "^0.8.3",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^6.4.299",
-    "vue": "^3.5.44"
+    "pdfjs-dist": "^6.5.438",
+    "vue": "^3.5.45"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
